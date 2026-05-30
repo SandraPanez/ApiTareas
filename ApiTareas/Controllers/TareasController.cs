@@ -17,10 +17,42 @@ public class TareasController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? estado,
+        [FromQuery] string? prioridad,
+        [FromQuery] DateTime? fechaInicio,
+        [FromQuery] DateTime? fechaFin)
     {
-        var tareas = await _context.Tareas.ToListAsync();
-        return Ok(tareas);
+        if (fechaInicio.HasValue && fechaFin.HasValue && fechaInicio > fechaFin)
+            return BadRequest("La fecha de inicio no puede ser mayor que la fecha fin.");
+
+        if (estado != null && !Enum.TryParse<EstadoTarea>(estado, out _))
+            return BadRequest("Estado no válido. Use: Pendiente, EnProceso, Completada.");
+
+        if (prioridad != null && !Enum.TryParse<PrioridadTarea>(prioridad, out _))
+            return BadRequest("Prioridad no válida. Use: Baja, Media, Alta.");
+
+        var query = _context.Tareas.AsQueryable();
+
+        if (estado != null)
+        {
+            var estadoEnum = Enum.Parse<EstadoTarea>(estado);
+            query = query.Where(t => t.Estado == estadoEnum);
+        }
+
+        if (prioridad != null)
+        {
+            var prioridadEnum = Enum.Parse<PrioridadTarea>(prioridad);
+            query = query.Where(t => t.Prioridad == prioridadEnum);
+        }
+
+        if (fechaInicio.HasValue)
+            query = query.Where(t => t.FechaVencimiento >= fechaInicio.Value);
+
+        if (fechaFin.HasValue)
+            query = query.Where(t => t.FechaVencimiento <= fechaFin.Value);
+
+        return Ok(await query.ToListAsync());
     }
 
     [HttpGet("{id}")]
